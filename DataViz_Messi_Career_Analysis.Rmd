@@ -1,0 +1,174 @@
+---
+title: "Assignment1"
+author: "roch_jia"
+date: "2022-09-27"
+output: pdf_document
+---
+
+Load the packages
+```{r}
+library(ggplot2)
+library(dplyr)
+library(GGally)
+```
+
+Load the data
+```{r}
+df <- read.csv('C:\\Users\\rochj\\Desktop\\Emory\\Data Visualization\\Assignment 1\\data1.csv')
+
+View(df)
+```
+
+```{r}
+df <- df %>%
+  mutate(Season = paste(substr(Season, 3, 5), substr(Season, 8, 9), sep=""))
+```
+
+
+Plot 1: Goals by season - Line
+```{r}
+goal_by_season <- df %>%
+  group_by(Season) %>% 
+  summarise(season_goal = n())
+```
+
+Apply ggplot to plot the data
+```{r}
+p1 <- ggplot(goal_by_season, aes(x = Season, y = season_goal, group = 1)) + 
+  geom_line(color = "#1034A6") + 
+  geom_point(color = "#1034A6") + geom_text(aes(label = season_goal),
+                                            vjust = -1, hjust = 0.5, 
+                                            size = 3, family = "serif") +
+  ylim(0, 80)
+  
+
+p1 <- p1 + 
+  theme(plot.subtitle = element_text(family = "serif",
+    size = 12, face = "italic", hjust = 1),
+    plot.caption = element_text(family = "serif",
+        size = 12, face = "italic"), axis.line = element_line(linetype = "solid"),
+    axis.ticks = element_line(linetype = "blank"),
+    panel.grid.major = element_line(linetype = "blank"),
+    panel.grid.minor = element_line(linetype = "blank"),
+    axis.title = element_text(family = "serif",
+        size = 12, face = "bold.italic"),
+    axis.text = element_text(family = "serif",
+        size = 9, face = "bold.italic"),
+    plot.title = element_text(family = "serif",
+        size = 15, face = "bold", hjust = 0.5),
+    panel.background = element_rect(fill = NA),
+    plot.background = element_rect(fill = "aliceblue",
+        colour = NA)) +labs(title = "Plot 1. Club Goal Distribution by Season",
+    y = "Goal", caption = "* The data for 22/23 Season is up to the end of Sep 2022")
+
+p1
+```
+Plot 2. Goals by Tournament - Tree Map
+```{r}
+goal_by_tournament <- df %>%
+  group_by(Competition) %>% 
+  summarise(tournament_goal = n())
+
+goal_by_tournament <- goal_by_tournament[order(-goal_by_tournament$tournament_goal),]
+
+lev <- as.array(goal_by_tournament$Competition)
+
+goal_by_tournament$Competition <- factor(goal_by_tournament$Competition, levels = lev)
+
+```
+
+```{r}
+library(treemapify)
+
+p2 <- ggplot(goal_by_tournament, aes(area = tournament_goal, fill = Competition, label = tournament_goal)) + 
+  geom_treemap() + 
+  geom_treemap_text(place = "center", family = "serif", size = 12, color = "white") +
+  scale_fill_manual(values = c("#1034A6", "#0E4D92", "#588BAE", "#4682B4", "#57A0D3", "#73C2FB", "#89CFF0", "#B0DFE5"))
+p2 <- p2 + theme(plot.title = element_text(family = "serif",
+    size = 14, face = "bold", hjust = 0.5),
+    legend.text = element_text(face = "italic",
+        family = "serif"), legend.title = element_text(size = 11,
+        face = "bold", family = "serif"),
+    plot.background = element_rect(fill = "aliceblue"),
+    legend.background = element_rect(fill = NA)) +labs(title = "Plot 2. Club Goal Distribution by Tournament")
+p2
+```
+Plot 3. Goal by Match Minutes
+```{r}
+goal_by_min <- df %>%
+  mutate(Minute1 = case_when(grepl("45\\+", Minute) ~ "0",
+                            grepl("90\\+", Minute) ~ "-1",
+                            TRUE ~ Minute)) %>%
+  mutate(Minute1 = as.numeric(Minute1)) %>%
+  mutate(half_time = case_when(Minute1 >= 0 & Minute1 <= 45 ~ "First Half",
+                               Minute1 == -1 | Minute1 > 45 ~ "Second Half")) %>%
+  mutate(Minute1 = case_when(Minute1 > 45 & Minute1 <= 90 ~ Minute1 - 45,
+                            TRUE ~ Minute1)) %>%
+  mutate(Minute1 = ifelse(Minute1 == 0 | Minute1 == -1 | Minute1 > 90, 46, Minute1)) %>%
+  select("half_time", "Minute1") %>%
+  group_by(half_time, Minute1) %>%
+  summarise(min_goal = n())
+
+goal_by_min <- goal_by_min[order(goal_by_min$Minute1),]
+
+```
+
+```{r}
+
+goal_by_min$Minute1 <- factor(goal_by_min$Minute1)
+
+p3 <- ggplot(data = goal_by_min, aes(x = Minute1, y = ifelse(half_time == "First Half", -min_goal, min_goal), fill = half_time)) +
+  geom_bar(stat = "identity", position = "identity",size = 0.25) +
+  geom_text(aes(label = min_goal), size = 4, hjust = 1, family = "serif") +
+  scale_y_continuous(labels = abs, breaks = seq(-15, 30, by = 5), limits = c(-15, 30)) +
+  scale_x_discrete(label=c("46"="Added Time")) +
+  xlab("Minute") +
+  ylab("Goal Count") +
+  ggtitle("Goal by Minute")+ 
+  coord_flip() + scale_fill_manual(values = c("#0E4D92", "#89CFF0"))
+
+p3 <- p3 + theme(axis.line = element_line(size = 0.3),
+    axis.ticks = element_line(linetype = "blank"),
+    panel.grid.major = element_line(linetype = "blank"),
+    panel.grid.minor = element_line(linetype = "blank"),
+    axis.title = element_text(family = "serif",
+        size = 12, face = "bold"), axis.text = element_text(family = "serif",
+        size = 9, face = "italic"), plot.title = element_text(family = "serif",
+        face = "bold", hjust = 0.5), legend.text = element_text(face = "italic",
+        family = "serif"), legend.title = element_text(face = "bold",
+        family = "serif"), panel.background = element_rect(fill = NA),
+    plot.background = element_rect(fill = "aliceblue"),
+    legend.background = element_rect(fill = NA),
+    legend.position = c(0.85, 0.8)) +labs(title = "Plot 3. Club Goal Distribution by Goal Time",
+    y = "Goal", fill = "Half Time")
+
+p3
+```
+
+
+Layout
+```{r}
+library(ggpubr)
+library(patchwork)
+
+patch <- (p1 / p2) | p3
+
+patch <- patch + plot_annotation(
+  title = "Lionel Messi: All Club Goals Recording",
+  caption = "Time Period: 2005.5 - 2022.9 \nData Source: https://www.kaggle.com/datasets/azminetoushikwasi/-lionel-messi-all-club-goals",
+  theme = theme(plot.title = element_text(family = "serif", size = 18, face = "bold", hjust = 0.5),
+  plot.caption = element_text(family = "serif", size = 10, face = "italic")))
+
+patch
+
+```
+
+
+
+
+
+
+
+
+
+
